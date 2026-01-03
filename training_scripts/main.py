@@ -1,24 +1,72 @@
 import torch.nn.functional as F
 import numpy as np
+import gymnasium as gym
 
 from sai_rl import SAIClient
 
-from ddpg import DDPG_FF
+from td3 import TD3
 from training import training_loop
 
-## Initialize the SAI client
-sai = SAIClient(comp_id="lower-t1-penalty-kick-goalie")
+# Define environment IDs for the 3 tasks
+ENV_IDS = [
+    "LowerT1GoaliePenaltyKick-v0",
+    "LowerT1ObstaclePenaltyKick-v0",
+    "LowerT1KickToTarget-v0"
+]
 
-## Make the environment
-env = sai.make_env()
+NUM_TIMESTEPS = 2000000
+
+class MultiTaskEnv(gym.Env):
+    def __init__(self, env_ids):
+        self.envs = [gym.make(id) for id in env_ids]
+        self.action_space = self.envs[0].action_space
+        self.observation_space = self.envs[0].observation_space
+        self.current_env_idx = 0
+
+    def reset(self, **kwargs):
+        self.current_env_idx = np.random.randint(len(self.envs))
+        obs, info = self.envs[self.current_env_idx].reset(**kwargs)
+        info['task_index'] = self.current_env_idx
+        return obs, info
+
+    def step(self, action):
+        obs, reward, terminated, truncated, info = self.envs[self.current_env_idx].step(action)
+        info['task_index'] = self.current_env_idx
+        return obs, reward, terminated, truncated, info
+
+    def close(self):
+        for env in self.envs:
+            env.close()
+
+## Initialize the SAI client
+# Moved to main execution block to avoid running on import
+
+## Make the environment (Use MultiTaskEnv for training)
+# Moved to main execution block
 
 class Preprocessor():
 
     def get_task_onehot(self, info):
-        if 'task_index' in info:
-            return info['task_index']
-        else:
-            return np.array([])
+        idx = info.get('task_index', None)
+        
+        if idx is None:
+            if "defender_xpos" in info:
+                idx = 1 # LowerT1ObstaclePenaltyKick-v0
+            elif "target_xpos_rel_robot" in info and "goalkeeper_team_0_xpos_rel_robot" not in info:
+                idx = 2 # LowerT1KickToTarget-v0
+            else:
+                idx = 0 # LowerT1GoaliePenaltyKick-v0 (Default)
+
+        # Handle 0-d array/scalar nuances
+        if hasattr(idx, 'item'):
+             idx = idx.item() if np.ndim(idx) == 0 else (idx[0] if len(idx) > 0 else 0)
+        
+        vec = np.zeros(3)
+        # Ensure idx is within bounds [0, 2]
+        safe_idx = int(idx)
+        if 0 <= safe_idx < 3:
+            vec[safe_idx] = 1.0
+        return vec
 
     def quat_rotate_inverse(self, q: np.ndarray, v: np.ndarray):
         q_w = q[:,[-1]]
@@ -27,6 +75,18 @@ class Preprocessor():
         b = np.cross(q_vec, v) * (q_w * 2.0)
         c = q_vec * (np.dot(q_vec, v).reshape(-1,1) * 2.0)    
         return a - b + c 
+
+    def safe_get(self, info, key, target_len):
+        val = np.zeros((1, target_len)) 
+        
+        if key in info:
+            data = info[key]
+            data = np.array(data).flatten()
+            current_len = len(data)
+            limit = min(target_len, current_len)
+            val[0, :limit] = data[:limit]
+            
+        return val
 
     def modify_state(self, obs, info):
         
@@ -37,6 +97,7 @@ class Preprocessor():
         if len(task_onehot.shape) == 1:
             task_onehot = np.expand_dims(task_onehot, axis=0)
         
+        # Always present keys (assuming base robot/ball/goal are in all)
         if len(info["robot_quat"].shape) == 1:
             info["robot_quat"] = np.expand_dims(info["robot_quat"], axis = 0)
             info["robot_gyro"] = np.expand_dims(info["robot_gyro"], axis = 0)
@@ -50,14 +111,16 @@ class Preprocessor():
             info["ball_velp_rel_robot"] = np.expand_dims(info["ball_velp_rel_robot"], axis = 0) 
             info["ball_velr_rel_robot"] = np.expand_dims(info["ball_velr_rel_robot"], axis = 0) 
             info["player_team"] = np.expand_dims(info["player_team"], axis = 0)
-            info["goalkeeper_team_0_xpos_rel_robot"] = np.expand_dims(info["goalkeeper_team_0_xpos_rel_robot"], axis = 0)
-            info["goalkeeper_team_0_velp_rel_robot"] = np.expand_dims(info["goalkeeper_team_0_velp_rel_robot"], axis = 0)
-            info["goalkeeper_team_1_xpos_rel_robot"] = np.expand_dims(info["goalkeeper_team_1_xpos_rel_robot"], axis = 0)
-            info["goalkeeper_team_1_velp_rel_robot"] = np.expand_dims(info["goalkeeper_team_1_velp_rel_robot"], axis = 0)
-            info["target_xpos_rel_robot"] = np.expand_dims(info["target_xpos_rel_robot"], axis = 0)
-            info["target_velp_rel_robot"] = np.expand_dims(info["target_velp_rel_robot"], axis = 0)
-            info["defender_xpos"] = np.expand_dims(info["defender_xpos"], axis = 0)
-        
+
+        # Variable keys with safe_get
+        goalkeeper_0_xpos = self.safe_get(info, "goalkeeper_team_0_xpos_rel_robot", 3)
+        goalkeeper_0_velp = self.safe_get(info, "goalkeeper_team_0_velp_rel_robot", 3)
+        goalkeeper_1_xpos = self.safe_get(info, "goalkeeper_team_1_xpos_rel_robot", 3)
+        goalkeeper_1_velp = self.safe_get(info, "goalkeeper_team_1_velp_rel_robot", 3)
+        target_xpos = self.safe_get(info, "target_xpos_rel_robot", 3)
+        target_velp = self.safe_get(info, "target_velp_rel_robot", 3)
+        defender_xpos = self.safe_get(info, "defender_xpos", 8) # Assuming 8 based on previous n_features=87 logic
+
         robot_qpos = obs[:,:12]
         robot_qvel = obs[:,12:24]
         quat = info["robot_quat"]
@@ -78,44 +141,84 @@ class Preprocessor():
                          info["ball_velp_rel_robot"], 
                          info["ball_velr_rel_robot"], 
                          info["player_team"], 
-                         info["goalkeeper_team_0_xpos_rel_robot"], 
-                         info["goalkeeper_team_0_velp_rel_robot"], 
-                         info["goalkeeper_team_1_xpos_rel_robot"], 
-                         info["goalkeeper_team_1_velp_rel_robot"], 
-                         info["target_xpos_rel_robot"], 
-                         info["target_velp_rel_robot"], 
-                         info["defender_xpos"],
+                         goalkeeper_0_xpos, 
+                         goalkeeper_0_velp, 
+                         goalkeeper_1_xpos, 
+                         goalkeeper_1_velp, 
+                         target_xpos, 
+                         target_velp, 
+                         defender_xpos,
                          task_onehot))
 
         return obs
 
+# --- DYNAMIC FEATURE CALCULATION ---
+# Moved to main execution block
+
 ## Create the model
-model = DDPG_FF(
-    n_features=87,  # type: ignore
-    action_space=env.action_space,  # type: ignore
-    neurons=[24, 12, 6],
-    activation_function=F.relu,
-    learning_rate=0.0001,
-)
+# Moved to main execution block
 
 ## Define an action function
-def action_function(policy):
-    expected_bounds = [-1, 1]
-    action_percent = (policy - expected_bounds[0]) / (
-        expected_bounds[1] - expected_bounds[0]
-    )
-    bounded_percent = np.minimum(np.maximum(action_percent, 0), 1)
-    return (
-        env.action_space.low
-        + (env.action_space.high - env.action_space.low) * bounded_percent
-    )
+def get_action_function(action_space):
+    def action_function(policy):
+        expected_bounds = [-1, 1]
+        action_percent = (policy - expected_bounds[0]) / (
+            expected_bounds[1] - expected_bounds[0]
+        )
+        bounded_percent = np.minimum(np.maximum(action_percent, 0), 1)
+        return (
+                action_space.low
+                + (action_space.high - action_space.low) * bounded_percent
+        )
+    return action_function
 
 
 ## Train the model
-training_loop(env, model, action_function, Preprocessor)
+if __name__ == "__main__":
+    # Initialize the SAI client
+    sai = SAIClient(
+        comp_id="lower-t1-penalty-kick-goalie",
+        api_key="sai_ddqEmPy1JIeQoGSI72BcdGUePbVdYtSj"
+    )
 
-## Watch
-sai.watch(model, action_function, Preprocessor)
+    # Make the environment
+    env = MultiTaskEnv(ENV_IDS)
 
-## Benchmark the model locally
-sai.benchmark(model, action_function, Preprocessor)
+    # Create a dummy environment just to check the observation size
+    dummy_obs, dummy_info = env.reset()
+    dummy_preprocessor = Preprocessor()
+
+    # Run the preprocessor once to see exactly how big the output is
+    processed_state = dummy_preprocessor.modify_state(dummy_obs, dummy_info)
+    REAL_N_FEATURES = processed_state.shape[1] 
+
+    print(f"Calculated Input Features: {REAL_N_FEATURES}")
+
+    # Create the model
+    model = TD3(
+        n_features=REAL_N_FEATURES,  
+        action_space=env.action_space, 
+        neurons=[400, 300], 
+        activation_function=F.relu,
+        learning_rate=0.0001,
+    )
+
+    # Create action function closure
+    action_function = get_action_function(env.action_space)
+
+    training_loop(env, model, action_function, Preprocessor, timesteps=NUM_TIMESTEPS)
+
+    ## Watch & Benchmark
+    # Only initialize SAIClient if we have credentials and want to upload/verify
+    try:
+        print("Initializing SAIClient for watch/benchmark...")
+        # sai client already initialized above
+        
+        ## Watch
+        sai.watch(model, action_function, Preprocessor)
+
+        ## Benchmark the model locally
+        sai.benchmark(model, action_function, Preprocessor)
+    except Exception as e:
+        print(f"\nSkipping SAI watch/benchmark due to error (likely missing API key): {e}")
+        print("Training completed successfully. Models are saved locally.")
