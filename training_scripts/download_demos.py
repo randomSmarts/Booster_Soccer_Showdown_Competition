@@ -2,16 +2,19 @@
 
 import os
 import shutil
-from huggingface_hub import snapshot_download
+from huggingface_hub import snapshot_download #allows you to download entire folders
+
+#This script downloads data of sucessful demos for which the model can learn from
 
 # --- CONFIGURATION ---
 REPO_ID = "SaiResearch/booster_dataset"
 REPO_SUBFOLDER = "soccer/booster_lower_t1"  # The specific folder you linked
-TARGET_DIR = os.path.join(os.path.dirname(__file__), "demonstrations")
+TARGET_DIR = os.path.join(os.path.dirname(__file__), "demonstrations") #creates a folder here to store the downloaded demo files here
 
-def download_and_flatten():
+def download_and_flatten(): #downloads every single file ending in .npz
     print(f"--- Downloading demonstrations from {REPO_ID} ---")
-    
+    # .npz files contain the saved states or memory of a robot, here for each demo is a successfull Numpy file containing all of the saved states
+
     # 1. Download the specific subfolder
     # This maintains the folder structure temporarily (e.g. demonstrations/soccer/booster_lower_t1/...)
     download_path = snapshot_download(
@@ -20,11 +23,11 @@ def download_and_flatten():
         allow_patterns=f"{REPO_SUBFOLDER}/*.npz",  # Only download .npz files
         local_dir=TARGET_DIR,
         local_dir_use_symlinks=False  # Download actual files, not symlinks
-    )
+    ) # type: ignore
     
     print("\n--- Flattening directory structure ---")
     
-    # 2. Move files from the nested folders to the root of TARGET_DIR
+    # 2. Move files from the nested folders to the root of TARGET_DIR, making them easily findable
     moved_count = 0
     for root, dirs, files in os.walk(TARGET_DIR):
         for file in files:

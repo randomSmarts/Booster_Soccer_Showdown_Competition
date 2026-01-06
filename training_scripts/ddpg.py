@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+# DDPG = Deep Deterministic Policy Gradient
+# TODO: explain DDPG here
+# This file is the baseline model script
 
 class NeuralNetwork(nn.Module):
     def __init__(
