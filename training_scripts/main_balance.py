@@ -31,3 +31,10 @@ if __name__ == "__main__":
     print("Starting Stage 1.5 Training: Balance Recovery (SAC)")
     train_balance()
     print("Balance training finished.")
+
+# Episodes: represents each rerun of the sim
+# Avg(20): represents the average reward across the past 20 episodes
+# BestEp: the max reward out of all past episodes
+# EpSteps: 
+# TotalSteps: 
+#

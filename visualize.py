@@ -1,7 +1,6 @@
-
 # Visualize stand: python visualize.py
 # Visualize balance: python visualize.py --model_type sac --model_path training_scripts/balance_models/sac_balance_best.pth --policy_clip 0.35
-
+# the above visualizes the current model in the kicking soccer ball task, policy_clip apparently makes the visualization more accurate???
 
 import torch
 import torch.nn.functional as F
@@ -15,8 +14,8 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'training_scripts'))
 
 from sai_rl import SAIClient
-from training_scripts.td3 import TD3
-from sac import SAC
+# from training_scripts.td3 import TD3
+from training_scripts.sac import SAC
 from training_scripts.main import Preprocessor, get_action_function, ENV_IDS
 
 import argparse
@@ -73,7 +72,7 @@ def visualize():
     # Use sai.make_env for convenience as it handles render modes and registration well
     # Or use gym.make(env_name, render_mode=RENDER_MODE) if registered
     env = gym.make(env_name, render_mode=RENDER_MODE)
-    action_function = get_action_function(env.action_space)
+    action_function = get_action_function()
 
     # 2. Initialize Preprocessor
     preprocessor = Preprocessor()
@@ -103,14 +102,14 @@ def visualize():
                 device=device,
             )
             print(f"[visualize] SAC device: {model.device}")
-        elif MODEL_TYPE.lower() == "td3":
-            model = TD3(
-                n_features=n_features,
-                action_space=env.action_space,
-                neurons=[400, 300],
-                activation_function=F.relu,
-                learning_rate=0.0001,
-            )
+        # elif MODEL_TYPE.lower() == "td3":
+        #     model = TD3(
+        #         n_features=n_features,
+        #         action_space=env.action_space,
+        #         neurons=[400, 300],
+        #         activation_function=F.relu,
+        #         learning_rate=0.0001,
+        #     )
         else:
             raise ValueError(f"Unknown MODEL_TYPE={MODEL_TYPE!r}. Use 'sac' or 'td3'.")
 

@@ -12,7 +12,7 @@ import sys
 # Allow importing from current directory when running as script
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from sac import SAC
+from training_scripts.sac import SAC
 from main import Preprocessor, get_action_function, ENV_IDS, MultiTaskEnv
 
 # Try to import sai_mujoco to register envs locally if SAIClient fails

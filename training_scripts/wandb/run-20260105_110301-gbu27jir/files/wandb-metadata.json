@@ -1,0 +1,37 @@
+{
+  "os": "macOS-15.5-arm64-arm-64bit",
+  "python": "CPython 3.11.14",
+  "startedAt": "2026-01-05T19:03:01.284371Z",
+  "program": "/Users/aarshmittal/SAI_SoccerRL/training_scripts/./main_balance.py",
+  "codePath": "training_scripts/main_balance.py",
+  "codePathLocal": "main_balance.py",
+  "git": {
+    "remote": "https://github.com/Ezimakyu/SAI_SoccerRL.git",
+    "commit": "6533cc9f0cc045baba24b859aa18b9b706e679a5"
+  },
+  "email": "aarshsmittal@gmail.com",
+  "root": "/Users/aarshmittal/SAI_SoccerRL/training_scripts",
+  "host": "mac.lan",
+  "executable": "/Users/aarshmittal/miniconda3/envs/booster-ssl/bin/python",
+  "cpu_count": 12,
+  "cpu_count_logical": 12,
+  "disk": {
+    "/": {
+      "total": "494384795648",
+      "used": "414444449792"
+    }
+  },
+  "memory": {
+    "total": "38654705664"
+  },
+  "apple": {
+    "name": "Apple M3 Pro",
+    "ecpuCores": 6,
+    "pcpuCores": 6,
+    "gpuCores": 18,
+    "memoryGb": 36,
+    "swapTotalBytes": "12884901888",
+    "ramTotalBytes": "38654705664"
+  },
+  "writerId": "19c5oybvlbt94izk09jbq431apt8j1bh"
+}
