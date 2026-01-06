@@ -1,4 +1,4 @@
-import torch.nn.functional as F
+import torch.nn.functional as F #neural network math
 import numpy as np
 import gymnasium as gym
 
@@ -6,6 +6,9 @@ from sai_rl import SAIClient
 
 import sys
 import os
+
+# The preprocessor is for picking out the 88 most useful data pieces and task flag
+# The action function translates model output to actual mechanical torque force
 
 # Add root directory to path to find sai_patch
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -27,29 +30,29 @@ ENV_IDS = [
     "LowerT1KickToTarget-v0"
 ]
 
-NUM_TIMESTEPS = 2000000
+NUM_TIMESTEPS = 2000000 #robot practices for this many times (this many death and restarts)
 
 class MultiTaskEnv(gym.Env):
     def __init__(self, env_ids):
-        self.envs = [gym.make(id) for id in env_ids]
-        self.action_space = self.envs[0].action_space
-        self.observation_space = self.envs[0].observation_space
-        self.current_env_idx = 0
+        self.envs = [gym.make(id) for id in env_ids] #creates all three envs and stores them in a list
+        self.action_space = self.envs[0].action_space #motor limits for the model
+        self.observation_space = self.envs[0].observation_space #observation space for the model
+        self.current_env_idx = 0 #start env at #0
 
     def reset(self, **kwargs):
-        self.current_env_idx = np.random.randint(len(self.envs))
-        obs, info = self.envs[self.current_env_idx].reset(**kwargs)
-        info['task_index'] = self.current_env_idx
+        self.current_env_idx = np.random.randint(len(self.envs)) #select a random task
+        obs, info = self.envs[self.current_env_idx].reset(**kwargs) #reset chosen env
+        info['task_index'] = self.current_env_idx #store which task we are doing so preprocessor knows
         return obs, info
 
     def step(self, action):
-        obs, reward, terminated, truncated, info = self.envs[self.current_env_idx].step(action)
-        info['task_index'] = self.current_env_idx
+        obs, reward, terminated, truncated, info = self.envs[self.current_env_idx].step(action) #take movement in random direction
+        info['task_index'] = self.current_env_idx #keep track of current task
         return obs, reward, terminated, truncated, info
 
     def close(self):
         for env in self.envs:
-            env.close()
+            env.close() #shut down all three tasks when done
 
 ## Initialize the SAI client
 # Moved to main execution block to avoid running on import
@@ -59,9 +62,9 @@ class MultiTaskEnv(gym.Env):
 
 class Preprocessor():
     def get_task_onehot(self, info, batch_size):
-        idx = info.get('task_index', None)
+        idx = info.get('task_index', None) #figures out what task the robot is doing
         
-        if idx is None:
+        if idx is None: #guesses what task based on objects present
             if "defender_xpos" in info:
                 idx = 1 # LowerT1ObstaclePenaltyKick-v0
             elif "target_xpos_rel_robot" in info and "goalkeeper_team_0_xpos_rel_robot" not in info:
@@ -76,13 +79,15 @@ class Preprocessor():
         except:
             safe_idx = 0
         
-        # Create a batch of one-hot vectors
+        # Create a batch of one-hot vectors, determining what task it is in
+        # TODO: Figure out what this is
         vecs = np.zeros((batch_size, 3), dtype=np.float32)
         if 0 <= safe_idx < 3:
             vecs[:, safe_idx] = 1.0
         return vecs
 
     def quat_rotate_inverse(self, q: np.ndarray, v: np.ndarray):
+        # quaternions used to determine which way is down regardless of body orientation
         # q is (batch, 4), v is (batch, 3)
         q_w = q[:, [-1]]
         q_vec = q[:, :3]
@@ -92,7 +97,7 @@ class Preprocessor():
         return a - b + c 
 
     def safe_get(self, info, key, target_len, batch_size):
-        # Initialize zero array for the full batch
+        # Initialize zero array for the full batch if goalie isn't there
         val = np.zeros((batch_size, target_len), dtype=np.float32) 
         if key in info:
             data = np.array(info[key])
@@ -120,7 +125,7 @@ class Preprocessor():
         batch_size = obs.shape[0]
 
         # 1. Task One-Hot
-        task_onehot = self.get_task_onehot(info, batch_size)
+        task_onehot = self.get_task_onehot(info, batch_size) #gets the task id (which one we are doing)
         
         # 2. Variable info keys (Goalkeepers, targets, etc.)
         goalkeeper_0_xpos = self.safe_get(info, "goalkeeper_team_0_xpos_rel_robot", 3, batch_size)
@@ -219,7 +224,7 @@ def get_action_function():
         # Clip strictly
         bounded_percent = np.minimum(np.maximum(action_percent, 0.0), 1.0)
         
-        # Scale to Torque
+        # Scale to Torque (-45 to 45)
         return low + (high - low) * bounded_percent
     return action_function
 
@@ -260,7 +265,7 @@ if __name__ == "__main__":
     # Make the environment
     env = MultiTaskEnv(ENV_IDS)
 
-    # Create a dummy environment just to check the observation size
+    # Create a dummy environment just to check the observation size (88 usually for us)
     dummy_obs, dummy_info = env.reset()
     dummy_preprocessor = Preprocessor()
 
@@ -271,18 +276,18 @@ if __name__ == "__main__":
     print(f"Calculated Input Features: {REAL_N_FEATURES}")
 
     # Create the model
-    # model = SAC(
-    #     n_features=REAL_N_FEATURES,  
-    #     action_space=env.action_space, 
-    #     neurons=[400, 300], 
-    #     activation_function=F.relu,
-    #     learning_rate=0.0001,
-    # )
+    model = SAC(
+        n_features=REAL_N_FEATURES,  
+        action_space=env.action_space, 
+        neurons=[256, 256], 
+        activation_function=F.relu,
+        learning_rate=0.0001,
+    )
 
     # Create action function closure
     action_function = get_action_function(env.action_space)
 
-    training_loop(env, model, action_function, Preprocessor, timesteps=NUM_TIMESTEPS)
+    training_loop(env, model, action_function, Preprocessor, timesteps=NUM_TIMESTEPS) #this runs the training_loop
 
     ## Watch & Benchmark
     # Only initialize SAIClient if we have credentials and want to upload/verify

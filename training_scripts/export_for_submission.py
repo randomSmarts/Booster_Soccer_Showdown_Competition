@@ -1,15 +1,15 @@
 import torch
 import torch.nn as nn
 import os
-from training_scripts.sac import SAC
+from sac import SAC
 import numpy as np
 
 # This file extracts the robot movements and saves it into a format called TorchScript (.pth)
 
 # --- CONFIG ---
-CHECKPOINT_PATH = "run_models/sac_run_checkpoint.pth" # Path to your best model 
+CHECKPOINT_PATH = "balance_models/sac_balance_checkpoint.pth" # Path to your best model 
 # TODO need to change
-OUTPUT_PATH = "submit_models/testsubmit3.pth" # What you will actually submit 
+OUTPUT_PATH = "balance_models/submitA.pth" # What you will actually submit 
 # TODO need to change
 
 STATE_DIM = 88  # Must match your Preprocessor output, this is the # of parameters the robot sees
