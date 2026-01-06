@@ -17,7 +17,7 @@ try:
 except ImportError:
     pass
 
-from sac import SAC
+from training_scripts.sac import SAC
 from training import training_loop
 
 # Define environment IDs for the 3 tasks

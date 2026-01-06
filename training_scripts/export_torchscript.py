@@ -1,6 +1,6 @@
 import torch
 import os
-from sac import SAC
+from training_scripts.sac import SAC
 from main import ENV_IDS, Preprocessor, MultiTaskEnv
 
 def export():
