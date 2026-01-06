@@ -15,3 +15,5 @@ for key in data.keys():
     obj = data[key]
     if hasattr(obj, 'shape'):
         print(f"{key}: {obj.shape}")
+
+# this file is used to determine STATE_DIM and ACTION_DIM since you load in a specific demo file and then extract the labels of the data stored inside
