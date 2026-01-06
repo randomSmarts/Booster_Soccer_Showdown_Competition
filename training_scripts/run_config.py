@@ -5,9 +5,6 @@ TIMESTEPS = 3000000          # Total training steps
 MAX_EPISODE_STEPS = 500      # 10 seconds at 50Hz
 DT = 0.02                    # Simulation timestep (50Hz)
 
-
-
-
 # --- 2. TRAINING HYPERPARAMETERS ---
 BATCH_SIZE = 256
 REPLAY_SIZE = 1000000
@@ -15,7 +12,6 @@ UPDATE_INTERVAL = 1          # Train every step
 UPDATES_PER_INTERVAL = 1
 WARMUP_STEPS = 2000          # Random actions before training
 LOG_EVERY_EPISODES = 5
-
 
 LOG_WINDOW_EPISODES = 20
 USE_WANDB = False            # Kept off as requested
@@ -76,78 +72,3 @@ PERTURB_PROB = 0.0
 PERTURB_POLICY_STD = 0.1
 DEBUG_REWARDS = True         
 DEBUG_PRINT_INTERVAL = 5
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -84,7 +84,7 @@ def visualize_demonstrations():
                     env.reset()
                     
                     # Play the tape
-                    total_reward = 0
+                    total_reward = 0.0
                     for t, raw_action in enumerate(actions):
                         # Handle shape issues (sometimes actions are [1, dim])
                         if len(raw_action.shape) > 1:

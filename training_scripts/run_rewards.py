@@ -12,28 +12,8 @@ def get_phase_targets(episode_time, freq):
     # Left Leg swings during first half (0.0 - 0.5)
     # Right Leg swings during second half (0.5 - 1.0)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # We use a sine wave to make the motion smooth
     # sin(0) = 0, sin(pi/2) = 1, sin(pi) = 0
-
-
-
-
-
-
 
     if phase < 0.5:
         # Left Leg Swing Phase
@@ -54,40 +34,11 @@ def calculate_reward(state, next_state, action, prev_action, qpos0, prev_base_an
     Calculates reward with Phase-Based Gait enforcement.
     """
 
-
-
-
     # --- 1. EXTRACT STATE ---
     # Based on your indices, state 0-11 are likely Joint Positions
     # 3 = Left Knee, 9 = Right Knee
     current_left_knee = next_state[3]
     current_right_knee = next_state[9]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     # Gravity Vector (approx indices 24-26 usually)
     # If standard MuJoCo: Z-axis of body frame in world
@@ -99,31 +50,8 @@ def calculate_reward(state, next_state, action, prev_action, qpos0, prev_base_an
     # We just penalize deviation from vertical generally.
     lean_magnitude = np.linalg.norm(projected_gravity[:2])
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     vel_x = next_state[33] # Velocimeter X
     vel_y = next_state[34] # Velocimeter Y
-
-
-
-
 
     # --- 2. TERMINATION ---
     terminated = False
@@ -141,32 +69,16 @@ def calculate_reward(state, next_state, action, prev_action, qpos0, prev_base_an
 
     # --- 3. REWARDS ---
 
-
-
-
     # A. SURVIVAL
     r_survival = C.SURVIVAL_W
-
-
-
-
-
-
-
 
     # B. HEIGHT (Target 0.62m)
     height_error = true_height - C.TARGET_HEIGHT
     r_height = np.exp(-np.square(height_error) / 0.05) * C.HEIGHT_W
 
-
-
-
     # C. TRACKING VELOCITY (Target 1.5 m/s)
     vel_error = vel_x - C.TARGET_VEL_X
     r_run = np.exp(-np.square(vel_error) / 0.5) * C.TRACKING_VEL_W
-
-
-
 
     # D. PHASE REWARD (The Zombie Fix)
     # ---------------------------------------------------------------------
@@ -184,20 +96,11 @@ def calculate_reward(state, next_state, action, prev_action, qpos0, prev_base_an
     r_phase = np.exp(-error_phase / 0.5) * C.PHASE_W
     # ---------------------------------------------------------------------
 
-
-
-
-
-
-
-
     # E. REGULARIZATION
     r_energy = -np.sum(np.square(action)) * C.ENERGY_W
     
     # Penalize Leaning Back specifically if possible, otherwise general upright
     r_upright = np.exp(-np.square(lean_magnitude) / 0.1) * C.UPRIGHT_W
-
-
 
     # --- 4. TOTAL ---
     # Gate the Run reward: No points for sliding on butt
@@ -212,12 +115,6 @@ def calculate_reward(state, next_state, action, prev_action, qpos0, prev_base_an
         r_energy
     )
 
-
-
-
-
-
-
     stats = {
         "reward_total": total_reward,
         "r_height": r_height,
@@ -226,11 +123,6 @@ def calculate_reward(state, next_state, action, prev_action, qpos0, prev_base_an
         "actual_vel_x": vel_x,
         "actual_height": true_height,
         "target_knee_L": t_left
-
-
-
-
-
     }
 
     return total_reward, terminated, reason, stats

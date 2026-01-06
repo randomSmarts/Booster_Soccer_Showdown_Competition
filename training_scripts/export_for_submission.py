@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import os
-from sac import SAC
+from training_scripts.sac import SAC
 import numpy as np
 
 # --- CONFIG ---

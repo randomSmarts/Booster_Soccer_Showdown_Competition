@@ -1,6 +1,5 @@
 # Usage: python inspect_keys.py demonstrations/goal_kick.npz
-# Understanding file structure of goal_kick.npz
-
+# Understanding file structure of goal_kick.npz=
 
 import numpy as np
 import sys
